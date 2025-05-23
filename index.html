@@ -1,1 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Analisador de Avaliações</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f0f0f0;
+    }
+    h2, h3 {
+      color: #333;
+    }
+    input, button {
+      font-size: 1em;
+      margin: 5px;
+      padding: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      background-color: white;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #666;
+      color: white;
+    }
+    .variabilidade.baixo {
+      color: green;
+    }
+    .variabilidade.moderado {
+      color: orange;
+    }
+    .variabilidade.alto {
+      color: red;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 0.9em;
+      color: #555;
+      text-align: center;
+    }
+    canvas {
+      margin-top: 30px;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+    #resultados p {
+      font-weight: bold;
+    }
+    #ranking {
+      margin-top: 20px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Analisador de Avaliações</h2>
 
+  <label for="numQuestoes">Número de questões:</label>
+  <input type="number" id="numQuestoes" min="1" max="50" value="5" />
+  <label for="numAlunos">Número de alunos:</label>
+  <input type="number" id="numAlunos" min="1" max="100" value="10" />
+  <button onclick="gerarTabela()">Gerar Tabela</button>
+
+  <div id="pontuacoesTabela"></div>
+
+  <button onclick="analisar()">Analisar Resultados</button>
+
+  <div id="resultados"></div>
+
+  <canvas id="graficoNotas" width="600" height="300" style="display:none;"></canvas>
+  <canvas id="graficoPizza" width="600" height="300" style="display:none;"></canvas>
+  <canvas id="graficoFaixas" width="600" height="300" style="display:none;"></canvas>
+
+  <div id="ranking"></div>
+
+  <footer>
+    Aplicativo criado por <strong>Holisses Bellon</strong><br />
+    Contato:
+    <a href="mailto:holisses.bellon@bosquemananciais.org.br"
+      >holisses.bellon@bosquemananciais.org.br</a
+    ><br />
+    Telefone: (41) 98815-7400
+  </footer>
+
+  <script>
+    let chart, pizzaChart, faixaChart;
+
+    function gerarTabela() {
+      const numQuestoes = parseInt(document.getElementById("numQuestoes").value);
+      const numAlunos = parseInt(document.getElementById("numAlunos").value);
+      const container = document.getElementById("pontuacoesTabela");
+
+      if (
+        isNaN(numQuestoes) ||
+        isNaN(numAlunos) ||
+        numQuestoes <= 0 ||
+        numAlunos <= 0
+      ) {
+        alert("Por favor, insira valores válidos.");
+        return;
+      }
+
+      let tabelaHTML = "<h3>Tabela de Pontuação</h3><table>";
+      tabelaHTML +=
+        "<tr><th>#</th><th>Nome do Aluno</th>";
+      for (let q = 1; q <= numQuestoes; q++) {
+        tabelaHTML += `<th>Q${q}</th>`;
+      }
+      tabelaHTML += "</tr><tr><td></td><td><strong>Conteúdo</strong></td>";
+      for (let q = 1; q <= numQuestoes; q++) {
+        tabelaHTML += `<td><input type="text" class="table-input" placeholder="Conteúdo Q${q}"></td>`;
+      }
+      tabelaHTML += "</tr>";
+
+      for (let a = 1; a <= numAlunos; a++) {
+        tabelaHTML += `<tr><td><strong>${a}</strong></td><td><input type="text" class="table-input" placeholder="Nome do Aluno ${a}"></td>`;
+        for (let q = 1; q <= numQuestoes; q++) {
+          tabelaHTML += `<td><input type="number" step="0.01" min="0" max="10" class="table-input" placeholder="Nota"></td>`;
+        }
+        tabelaHTML += "</tr>";
+      }
+
+      tabelaHTML += "</table>";
+      container.innerHTML = tabelaHTML;
+
+      document.getElementById("resultados").innerHTML = "";
+      document.getElementById("graficoNotas").style.display = "none";
+      document.getElementById("graficoPizza").style.display = "none";
+      document.getElementById("graficoFaixas").style.display = "none";
+      document.getElementById("ranking").innerHTML = "";
+    }
+
+    function analisar() {
+      const tabela = document.querySelector("#pontuacoesTabela table");
+      if (!tabela) return alert("Gere a tabela primeiro!");
+
+      const linhas = tabela.rows;
+      const numQuestoes = linhas[0].cells.length - 2;
+      const numAlunos = linhas.length - 2;
+
+      const nomes = [];
+      const notasFinais = [];
+      const percentuais = [];
+      let aprovados = 0;
+
+      for (let i = 2; i < linhas.length; i++) {
+        const cells = linhas[i].cells;
+        const nome = cells[1].querySelector("input").value || `Aluno ${i - 1}`;
+        let total = 0;
+
+        for (let j = 2; j < cells.length; j++) {
+          const valor = parseFloat(cells[j].querySelector("input").value);
+          total += isNaN(valor) ? 0 : valor;
+        }
+
+        nomes.push(nome);
+        notasFinais.push(parseFloat(total.toFixed(2)));
+        const percentual = ((total / (numQuestoes * 10)) * 100).toFixed(2);
+        percentuais.push(percentual);
+
+        if (total >= 7 * numQuestoes) {
+          aprovados++;
+        }
+      }
+
+      const media =
+        notasFinais.reduce((a, b) => a + b, 0) / notasFinais.length;
+      const mediaFormatada = media.toFixed(2);
+      const variancia =
+        notasFinais.reduce((soma, nota) => soma + Math.pow(nota - media, 2), 0) /
+        notasFinais.length;
+      const desvio = Math.sqrt(variancia).toFixed(2);
+
+      let nivel = "",
+        classe = "";
+      if (desvio <= 1) {
+        nivel = "Baixo";
+        classe = "baixo";
+      } else if (desvio <= 2) {
+        nivel = "Moderado";
+        classe = "moderado";
+      } else {
+        nivel = "Alto";
+        classe = "alto";
+      }
+
+      const reprovados = numAlunos - aprovados;
+
+      document.getElementById("resultados").innerHTML = `
+        <p><strong>Média das notas finais:</strong> ${mediaFormatada}</p>
+        <p><strong>Desvio padrão:</strong> ${desvio}</p>
+        <p class="variabilidade ${classe}">Variabilidade: ${nivel}</p>
+        <p><strong>Aprovados:</strong> ${aprovados}</p>
+        <p><strong>Reprovados:</strong> ${reprovados}</p>
+      `;
+
+      const ctx = document.getElementById("graficoNotas").getContext("2d");
+      document.getElementById("graficoNotas").style.display = "block";
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: nomes,
+          datasets: [
+            {
+              label: "Nota Final",
+              data: notasFinais,
+              backgroundColor: notasFinais.map((n) =>
+                n < media ? "rgba(255, 99, 132, 0.7)" : "rgba(54, 162, 235, 0.7)"
+              ),
+              borderColor: notasFinais.map((n) =>
+                n < media ? "rgba(255, 99, 132, 1)" : "rgba(54, 162, 235, 1)"
+              ),
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true },
+          },
+        },
+      });
+
+      const ctxPizza = document.getElementById("graficoPizza").getContext("2d");
+      document.getElementById("graficoPizza").style.display = "block";
+
+      if (pizzaChart) pizzaChart.destroy();
+
+      pizzaChart = new Chart(ctxPizza, {
+        type: "pie",
+        data: {
+          labels: nomes,
+          datasets: [
+            {
+              label: "% de Acertos",
+              data: percentuais,
+              backgroundColor: nomes.map(
+                (_, i) => `hsl(${(i * 360) / nomes.length}, 70%, 60%)`
+              ),
+            },
+          ],
+        },
+      });
+
+      // Gráfico de faixas
+      const faixas = [0, 0, 0, 0, 0];
+      notasFinais.forEach((n) => {
+        if (n < 2) faixas[0]++;
+        else if (n < 4) faixas[1]++;
+        else if (n < 6) faixas[2]++;
+        else if (n < 8) faixas[3]++;
+        else faixas[4]++;
+      });
+
+      const ctxFaixas = document.getElementById("graficoFaixas").getContext("2d");
+      document.getElementById("graficoFaixas").style.display = "block";
+
+      if (faixaChart) faixaChart.destroy();
+
+      faixaChart = new Chart(ctxFaixas, {
+        type: "bar",
+        data: {
+          labels: ["0-2", "2-4", "4-6", "6-8", "8-10"],
+          datasets: [
+            {
+              label: "Frequência",
+              data: faixas,
+              backgroundColor: [
+                "#ff6384",
+                "#ff9f40",
+                "#ffcd56",
+                "#4bc0c0",
+                "#36a2eb",
+              ],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, precision: 0 },
+          },
+        },
+      });
+
+      // === Tabela de Ranking ===
+      const rankingDiv = document.getElementById("ranking");
+      // cria array de objetos para ordenar
+      const alunosRanking = nomes.map((nome, idx) => ({
+        nome: nome,
+        nota: notasFinais[idx],
+      }));
+
+      // Ordena decrescente por nota
+      alunosRanking.sort((a, b) => b.nota - a.nota);
+
+      let rankingHTML = "<h3>Ranking dos Alunos</h3><table>";
+      rankingHTML += "<tr><th>Posição</th><th>Nome do Aluno</th><th>Nota Final</th></tr>";
+
+      alunosRanking.forEach((aluno, i) => {
+        rankingHTML += `<tr><td>${i + 1}</td><td>${aluno.nome}</td><td>${aluno.nota.toFixed(
+          2
+        )}</td></tr>`;
+      });
+
+      rankingHTML += "</table>";
+      rankingDiv.innerHTML = rankingHTML;
+    }
+  </script>
+</body>
+</html>
